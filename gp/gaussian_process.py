@@ -6,16 +6,20 @@ import numpy as np
 import theano.tensor as T
 import theano.sandbox.linalg as sT
 
+from .optimize import optimize
+
 
 class GaussianProcess(object):
     """Gaussian Process regressor."""
 
-    def __init__(self, kernel, sigma_n):
+    def __init__(self, kernel, sigma_n, bounds=(1e-5, 1.0)):
         """Constructs a GaussianProcess.
 
         Args:
             kernel (Kernel): Kernel to use.
-            sigma_n (SharedVariable<dscalar>): Noise variance.
+            sigma_n (SharedVariable<dscalar>): Noise standard deviation.
+            bounds (tuple<float, float>): Minimum and maximum bounds for
+                the sigma_n hyperparameter.
         """
         self._kernel = kernel
         self._sigma_n = sigma_n
@@ -24,6 +28,12 @@ class GaussianProcess(object):
             p for p in kernel.hyperparameters if p != sigma_n
         ]
         self._hyperparameters.append(sigma_n)
+
+        self._bounds = [
+            kernel.bounds[i] for i, p in enumerate(kernel.hyperparameters)
+            if p != sigma_n
+        ]
+        self._bounds.append(bounds)
 
         self.X = T.dmatrix("X")
         self.Y = T.dmatrix("Y")
@@ -47,7 +57,7 @@ class GaussianProcess(object):
         # Kernel functions.
         K_ss = self._kernel(x, x)
         K_s = self._kernel(x, X)
-        K = self._kernel(X, X) + self._sigma_n * T.eye(X.shape[0])
+        K = self._kernel(X, X) + self._sigma_n**2 * T.eye(X.shape[0])
 
         # Mean and variance functions.
         K_inv = sT.matrix_inverse(K)
@@ -60,8 +70,7 @@ class GaussianProcess(object):
         std = T.sqrt(T.diag(K_ss) - T.sum(L_k**2, axis=0)).reshape((-1, 1))
 
         # Compute the log likelihood.
-        alpha = T.slinalg.solve_lower_triangular(L, Y)
-        log_likelihood_dims = -0.5 * T.dot(Y.T, alpha).sum(axis=0)
+        log_likelihood_dims = -0.5 * T.dot(Y.T, T.dot(K_inv, Y)).sum(axis=0)
         log_likelihood_dims -= T.log(T.diag(L)).sum()
         log_likelihood_dims -= L.shape[0] / 2 * T.log(2 * np.pi)
         log_likelihood = log_likelihood_dims.sum(axis=-1)
@@ -86,6 +95,11 @@ class GaussianProcess(object):
         return self._hyperparameters
 
     @property
+    def bounds(self):
+        """List of minimum and maximum bounds for each hyperparameter."""
+        return self._bounds
+
+    @property
     def mean(self):
         """Expectation tensor variable."""
         return self._mu
@@ -105,17 +119,23 @@ class GaussianProcess(object):
         """Log likelihood tensor variable."""
         return self._log_likelihood
 
-    def fit(self, X, Y):
+    def fit(self, X, Y, skip_optimization=False, *args, **kwargs):
         """Fits the model.
 
         Args:
             X (SharedVariable<dmatrix>): Input data.
             Y (SharedVariable<dvector>): Output data.
+            skip_optimization (bool): Optimize the hyperparameters.
+            *args, **kwargs: Additional positional and key-word arguments to
+                pass to `optimize()`.
         """
         self.X_train = X
         self.Y_train = Y
 
-        # TODO: Optimize hyperparameters.
+        if skip_optimization:
+            return
+
+        return optimize(self, *args, **kwargs)
 
     def compile(self):
         """Compiles the gaussian process's tensors into proper functions."""

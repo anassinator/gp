@@ -21,17 +21,26 @@ class Kernel():
         """Hyperparameters."""
         raise NotImplementedError()
 
+    @property
+    @abc.abstractmethod
+    def bounds(self):
+        """List of minimum and maximum bounds for each hyperparameter."""
+        raise NotImplementedError()
+
 
 class RBFKernel(Kernel):
     """Radial-Basis Function Kernel."""
 
-    def __init__(self, length_scale, sigma_s, sigma_n):
+    def __init__(self, length_scale, sigma_s, sigma_n,
+                 bounds=[(1e-5, 1e6), (1e-5, 1.0), (1e-5, 1.0)]):
         """Construct an RBFKernel.
 
         Args:
             length_scale (SharedVariable<dscalar>): Length scale.
-            sigma_s (SharedVariable<dscalar>): Signal variance.
-            sigma_n (SharedVariable<dscalar>): Noise variance.
+            sigma_s (SharedVariable<dscalar>): Signal standard deviation.
+            sigma_n (SharedVariable<dscalar>): Noise standard deviation.
+            bounds (list<tuple<float, float>>): Minimum and maximum bounds for
+                each hyperparameter.
         """
         self._sigma_s = sigma_s
         self._sigma_n = sigma_n
@@ -41,6 +50,8 @@ class RBFKernel(Kernel):
             p for p in (length_scale, sigma_s, sigma_n)
             if isinstance(p, T.sharedvar.SharedVariable)
         ]
+
+        self._bounds = bounds
 
     def __call__(self, xi, xj):
         """Kernel function."""
@@ -54,3 +65,8 @@ class RBFKernel(Kernel):
     def hyperparameters(self):
         """Hyperparameters."""
         return self._hyperparameters
+
+    @property
+    def bounds(self):
+        """List of minimum and maximum bounds for each hyperparameter."""
+        return self._bounds
