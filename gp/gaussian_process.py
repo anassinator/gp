@@ -12,7 +12,7 @@ from .optimize import optimize
 class GaussianProcess(object):
     """Gaussian Process regressor."""
 
-    def __init__(self, kernel, sigma_n, bounds=(1e-5, 1.0)):
+    def __init__(self, kernel, sigma_n, bounds=(1e-5, 1.0), normalize_y=True):
         """Constructs a GaussianProcess.
 
         Args:
@@ -20,6 +20,8 @@ class GaussianProcess(object):
             sigma_n (SharedVariable<dscalar>): Noise standard deviation.
             bounds (tuple<float, float>): Minimum and maximum bounds for
                 the sigma_n hyperparameter.
+            normalize_y (bool): Normalize the Y values to have 0 mean and unit
+                variance.
         """
         self._kernel = kernel
         self._sigma_n = sigma_n
@@ -46,13 +48,23 @@ class GaussianProcess(object):
         self._var_f = self.__need_to_compile
         self._std_f = self.__need_to_compile
 
-        self.__setup()
+        self.__build_graph(normalize_y)
 
-    def __setup(self):
-        """Sets up the gaussian process's tensor variables."""
+    def __build_graph(self, normalize_y):
+        """Sets up the gaussian process's tensor variables.
+
+        Args:
+            normalize_y (bool): Normalize the Y values to have 0 mean and unit
+                variance.
+        """
         X = self.X
         Y = self.Y
         x = self.x
+
+        if normalize_y:
+            Y_mean = T.mean(Y, axis=0)
+            Y_variance = T.std(Y, axis=0)
+            Y = (Y - Y_mean) / Y_variance
 
         # Kernel functions.
         K_ss = self._kernel(x, x)
@@ -61,7 +73,7 @@ class GaussianProcess(object):
 
         # Mean and variance functions.
         K_inv = sT.matrix_inverse(K)
-        mu = T.dot(K_s, T.dot(K_inv, Y))
+        mu = T.dot(K_s, T.dot(K_inv, self.Y))  # Non-normalized Y for scale.
         var = K_ss - T.dot(K_s, T.dot(K_inv, K_s.T))
 
         # Compute the standard deviation.
