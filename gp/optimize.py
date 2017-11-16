@@ -5,8 +5,12 @@ import theano.tensor as T
 from scipy.optimize import fmin_l_bfgs_b
 
 
-def optimize(gp, params=None, optimizer=fmin_l_bfgs_b, bound=True,
-             *args, **kwargs):
+def optimize(gp,
+             params=None,
+             optimizer=fmin_l_bfgs_b,
+             bound=True,
+             *args,
+             **kwargs):
     """Optimizes a gaussian process.
 
     Args:

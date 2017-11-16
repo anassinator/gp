@@ -6,23 +6,40 @@ import numpy as np
 import theano.tensor as T
 import theano.sandbox.linalg as sT
 
+from .kernel import RBFKernel
 from .optimize import optimize
 
 
 class GaussianProcess(object):
     """Gaussian Process regressor."""
 
-    def __init__(self, kernel, sigma_n, bounds=(1e-5, 1.0), normalize_y=True):
+    def __init__(self,
+                 kernel=None,
+                 sigma_n=None,
+                 bounds=(1e-5, 1.0),
+                 normalize_y=True):
         """Constructs a GaussianProcess.
 
         Args:
-            kernel (Kernel): Kernel to use.
-            sigma_n (SharedVariable<dscalar>): Noise standard deviation.
+            kernel (Kernel): Kernel to use, default: RBFKernel.
+            sigma_n (SharedVariable<dscalar>): Noise standard deviation,
+                default: random.
             bounds (tuple<float, float>): Minimum and maximum bounds for
                 the sigma_n hyperparameter.
             normalize_y (bool): Normalize the Y values to have 0 mean and unit
                 variance.
         """
+        if sigma_n is None:
+            sigma_n = theano.shared(
+                np.random.random() / 10, name="sigma_n", borrow=True)
+
+        if kernel is None:
+            sigma_s = theano.shared(
+                np.random.random(), name="sigma_s", borrow=True)
+            length_scale = theano.shared(
+                np.random.random(), name="sigma_s", borrow=True)
+            kernel = RBFKernel(length_scale, sigma_s, sigma_n)
+
         self._kernel = kernel
         self._sigma_n = sigma_n
 
@@ -91,11 +108,6 @@ class GaussianProcess(object):
         self._var = var
         self._std = std
         self._log_likelihood = log_likelihood
-
-        # TODO: Find a better way to do this and verify scaling is correct.
-        self._mu_grad = T.jacobian(mu.flatten(), x).sum(axis=0)
-        self._var_grad = T.jacobian(var.flatten(), x).sum(axis=0)
-        self._std_grad = T.jacobian(std.flatten(), x).sum(axis=0)
 
     def __need_to_compile(self, *args, **kwargs):
         """Helper function to verify compilation."""

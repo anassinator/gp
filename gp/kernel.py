@@ -31,7 +31,10 @@ class Kernel():
 class RBFKernel(Kernel):
     """Radial-Basis Function Kernel."""
 
-    def __init__(self, length_scale, sigma_s, sigma_n,
+    def __init__(self,
+                 length_scale,
+                 sigma_s,
+                 sigma_n,
                  bounds=[(1e-5, 1e6), (1e-5, 1.0), (1e-5, 1.0)]):
         """Construct an RBFKernel.
 
