@@ -22,9 +22,10 @@ setup(
     url=base_url,
     download_url="{}/tarball/{}".format(base_url, __version__),
     packages=["gp"],
+    zip_safe=True,
     install_requires=[read("requirements.txt").strip().split("\n")],
     classifiers=[
-        "Development Status :: 1 - Planning",
+        "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
