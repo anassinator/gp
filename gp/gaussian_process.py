@@ -11,6 +11,7 @@ from .optimize import optimize
 
 
 class GaussianProcess(object):
+
     """Gaussian Process regressor."""
 
     def __init__(self,

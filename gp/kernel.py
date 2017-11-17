@@ -8,6 +8,7 @@ import theano.tensor as T
 
 @six.add_metaclass(abc.ABCMeta)
 class Kernel():
+
     """Base Kernel."""
 
     @abc.abstractmethod
@@ -29,6 +30,7 @@ class Kernel():
 
 
 class RBFKernel(Kernel):
+
     """Radial-Basis Function Kernel."""
 
     def __init__(self,
