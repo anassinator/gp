@@ -17,6 +17,7 @@ class GaussianProcess(object):
     def __init__(self,
                  kernel=None,
                  sigma_n=None,
+                 xdim=None,
                  bounds=(1e-5, 1.0),
                  normalize_y=True):
         """Constructs a GaussianProcess.
@@ -25,6 +26,8 @@ class GaussianProcess(object):
             kernel (Kernel): Kernel to use, default: RBFKernel.
             sigma_n (SharedVariable<dscalar>): Noise standard deviation,
                 default: random.
+            xdim (int): Input dimension for length scale initialization if a
+                kernel is not specified, default: use scalar length scale.
             bounds (tuple<float, float>): Minimum and maximum bounds for
                 the sigma_n hyperparameter.
             normalize_y (bool): Normalize the Y values to have 0 mean and unit
@@ -38,7 +41,7 @@ class GaussianProcess(object):
             sigma_s = theano.shared(
                 np.random.random(), name="sigma_s", borrow=True)
             length_scale = theano.shared(
-                np.random.random(), name="sigma_s", borrow=True)
+                np.random.random(xdim), name="length_scale", borrow=True)
             kernel = RBFKernel(length_scale, sigma_s, sigma_n)
 
         self._kernel = kernel

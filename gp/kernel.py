@@ -41,30 +41,29 @@ class RBFKernel(Kernel):
         """Construct an RBFKernel.
 
         Args:
-            length_scale (SharedVariable<dscalar>): Length scale.
+            length_scale (SharedVariable<dscalar> or SharedVariable<dvector>):
+                Length scale.
             sigma_s (SharedVariable<dscalar>): Signal standard deviation.
             sigma_n (SharedVariable<dscalar>): Noise standard deviation.
             bounds (list<tuple<float, float>>): Minimum and maximum bounds for
                 each hyperparameter.
         """
-        self._sigma_s = sigma_s
-        self._sigma_n = sigma_n
-        self._length_scale = length_scale
-
         self._hyperparameters = [
             p for p in (length_scale, sigma_s, sigma_n)
             if isinstance(p, T.sharedvar.SharedVariable)
         ]
 
+        self._sigma_s = sigma_s
+        self._sigma_n = sigma_n
+        self._length_scale = length_scale
+
         self._bounds = bounds
 
     def __call__(self, xi, xj):
         """Kernel function."""
-        xi_squared = T.sum(xi**2, axis=1).reshape((-1, 1))
-        xj_squared = T.sum(xj**2, axis=1).reshape((1, -1))
-        dist_squared = xi_squared - 2 * T.dot(xi, xj.T) + xj_squared
-        k = T.exp(-0.5 * (1 / self._length_scale) * dist_squared)
-        return self._sigma_s**2 * k + self._sigma_n**2
+        M = T.eye(xi.shape[1]) * self._length_scale**-2
+        dist = mahalanobis(xi, xj, M)
+        return self._sigma_s**2 * T.exp(-0.5 * dist) + self._sigma_n**2
 
     @property
     def hyperparameters(self):
@@ -75,3 +74,29 @@ class RBFKernel(Kernel):
     def bounds(self):
         """List of minimum and maximum bounds for each hyperparameter."""
         return self._bounds
+
+
+def mahalanobis(xi, xj, VI=None):
+    """Computes the pair-wise squared mahalanobis distance matrix as:
+
+        (xi - xj)^T V^-1 (xi - xj)
+
+    Args:
+        xi: xi input matrix.
+        xj: xj input matrix.
+        VI: The inverse of the covariance matrix, default: identity matrix.
+
+    Returns:
+        Weighted matrix of all pair-wise distances.
+    """
+    if VI is None:
+        D = T.sum(T.square(xi), axis=1).reshape((-1, 1)) \
+          + T.sum(T.square(xj), axis=1).reshape((1, -1)) \
+          - 2 * xi.dot(xj.T)
+    else:
+        xi_VI = xi.dot(VI)
+        xj_VI = xj.dot(VI)
+        D = T.sum(xi_VI * xi, axis=1).reshape((-1, 1)) \
+          + T.sum(xj_VI * xj, axis=1).reshape((1, -1)) \
+          - 2 * xi_VI.dot(xj.T)
+    return D
