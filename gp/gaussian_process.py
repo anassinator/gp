@@ -12,7 +12,14 @@ from .optimize import optimize
 
 class GaussianProcess(object):
 
-    """Gaussian Process regressor."""
+    """
+    Gaussian Process regressor.
+
+    This is meant for multi-input, single-output functions.
+    It still works for multi-output functions, but will share the same
+    hyperparameters for each. If that is not wanted, use `MultiGaussianProcess`
+    instead.
+    """
 
     def __init__(self,
                  kernel=None,
@@ -65,24 +72,21 @@ class GaussianProcess(object):
         self.Y_train = None
 
         # Defaults.
-        self._mu_f = self.__need_to_compile
-        self._var_f = self.__need_to_compile
-        self._std_f = self.__need_to_compile
+        self._mu_f = _need_to_compile
+        self._var_f = _need_to_compile
+        self._std_f = _need_to_compile
 
-        self.__build_graph(normalize_y)
+        self._normalize_y = normalize_y
 
-    def __build_graph(self, normalize_y):
-        """Sets up the gaussian process's tensor variables.
+        self._build_graph()
 
-        Args:
-            normalize_y (bool): Normalize the Y values to have 0 mean and unit
-                variance.
-        """
+    def _build_graph(self):
+        """Sets up the gaussian process's tensor variables."""
         X = self.X
         Y = self.Y
         x = self.x
 
-        if normalize_y:
+        if self._normalize_y:
             Y_mean = T.mean(Y, axis=0)
             Y_variance = T.std(Y, axis=0)
             Y = (Y - Y_mean) / Y_variance
@@ -112,10 +116,6 @@ class GaussianProcess(object):
         self._var = var
         self._std = std
         self._log_likelihood = log_likelihood
-
-    def __need_to_compile(self, *args, **kwargs):
-        """Helper function to verify compilation."""
-        raise Exception("You must .compile() before calling this")
 
     @property
     def hyperparameters(self):
@@ -167,7 +167,7 @@ class GaussianProcess(object):
 
     def compile(self):
         """Compiles the gaussian process's tensors into proper functions."""
-        if None in (self.X_train, self.Y_train):
+        if self.X_train is None or self.Y_train is None:
             raise Exception("You must .fit() before compiling")
 
         inputs = [self.x]
@@ -228,13 +228,125 @@ class GaussianProcess(object):
         """
         return self._std_f(x)
 
-    def compute_log_likelihood(self, x):
-        """Computes the log likelihood of x.
+
+class MultiGaussianProcess(GaussianProcess):
+
+    """
+    Layer of abstraction to estimate vector-valued functions with a separate
+    Gaussian Process for each output dimension.
+
+    This learns separate hyperparameters for each output dimension instead of
+    a single set for all dimensions.
+    """
+
+    def __init__(self, ydim, kernels=None, *args, **kwargs):
+        """Constructs a MultiGaussianProcess.
+
+        Args: 
+            ydim (int): Output dimension for number of Gaussian Processes to
+                use.
+            kernels (list<Kernel>): List of kernels to use for each dimension,
+                default: RBFKernel for each.
+            *args, **kwargs: Additional positional and key-word arguments to
+                the Gaussian Process constructor.
+        """
+        if kernels is None:
+            self._processes = [
+                GaussianProcess(*args, **kwargs) for i in range(ydim)
+            ]
+        else:
+            self._processes = [
+                GaussianProcess(kernels[i], *args, **kwargs)
+                for i in range(ydim)
+            ]
+
+        self.X = T.dmatrix("X")
+        self.Y = T.dmatrix("Y")
+        self.x = T.dmatrix("x")
+        self.X_train = None
+        self.Y_train = None
+
+        self._hyperparameters = [
+            p for gp in self._processes for p in gp.hyperparameters
+        ]
+
+        self._bounds = [
+            gp.bounds[i]
+            for gp in self._processes for i, p in enumerate(gp.hyperparameters)
+        ]
+
+        # Defaults.
+        self._mu_f = _need_to_compile
+        self._var_f = _need_to_compile
+        self._std_f = _need_to_compile
+
+        self._build_graph()
+
+    def _build_graph(self):
+        """Sets up the gaussian process's tensor variables."""
+        # Rebuild the child gaussian processes' graphs with overrided, shared
+        # variables.
+        for gp in self._processes:
+            gp.X = self.X
+            gp.x = self.x
+            gp._build_graph()
+
+        # Concatenate the chidren's tensors for the parent.
+        self._mu = T.concatenate([gp._mu for gp in self._processes], axis=1)
+        self._std = T.concatenate([gp._std for gp in self._processes], axis=1)
+        self._var = T.stack([gp._var for gp in self._processes], axis=2)
+        self._log_likelihood = T.sum(
+            [gp._log_likelihood for gp in self._processes])
+
+    def fit(self, X, Y, *args, **kwargs):
+        """Fits the model.
 
         Args:
-            x (dvector): Inputs.
-
-        Returns:
-            Log likelihood of each input.
+            X (SharedVariable<dmatrix>): Input data.
+            Y (SharedVariable<dvector>): Output data.
+            *args, **kwargs: Additional positional and key-word arguments to
+                pass to each gaussian process's fit() function.
         """
-        return self._log_likelihood_f(x)
+        self.X_train = X
+        self.Y_train = Y
+
+        # Fitting them individually is faster than fitting them together as
+        # they are completely independent of each other.
+        for i, gp in enumerate(self._processes):
+            gp.fit(X, Y[:, i].reshape((-1, 1)), *args, **kwargs)
+
+    def compile(self):
+        """Compiles the gaussian process's tensors into proper functions."""
+        if self.X_train is None or self.Y_train is None:
+            raise Exception("You must .fit() before compiling")
+
+        inputs = [self.x]
+        givens = {
+            gp.Y: self.Y_train[:, i].reshape((-1, 1))
+            for i, gp in enumerate(self._processes)
+        }
+        givens[self.X] = self.X_train
+
+        self._mu_f = theano.function(
+            inputs,
+            self._mu,
+            name="mu",
+            givens=givens,
+            on_unused_input="ignore")
+        self._var_f = theano.function(
+            inputs,
+            self._var,
+            name="var",
+            givens=givens,
+            on_unused_input="ignore")
+        self._std_f = theano.function(
+            inputs,
+            self._std,
+            name="std",
+            givens=givens,
+            on_unused_input="ignore")
+
+
+def _need_to_compile(*args, **kwargs):
+    """Helper function to verify compilation."""
+    raise Exception("You must .compile() before calling this")
