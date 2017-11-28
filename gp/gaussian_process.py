@@ -96,6 +96,9 @@ class GaussianProcess(object):
         K_s = self._kernel(x, X)
         K = self._kernel(X, X) + self._sigma_n**2 * T.eye(X.shape[0])
 
+        # Guarantee positive definite.
+        K = 0.5 * (K + K.T)
+
         # Mean and variance functions.
         K_inv = sT.matrix_inverse(K)
         mu = T.dot(K_s, T.dot(K_inv, self.Y))  # Non-normalized Y for scale.
