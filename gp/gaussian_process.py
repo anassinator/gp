@@ -65,6 +65,8 @@ class GaussianProcess(object):
         ]
         self._bounds.append(bounds)
 
+        self._givens = {}
+
         self.X = T.dmatrix("X")
         self.Y = T.dmatrix("Y")
         self.x = T.dmatrix("x")
@@ -150,6 +152,12 @@ class GaussianProcess(object):
         """Log likelihood tensor variable."""
         return self._log_likelihood
 
+    @property
+    def givens(self):
+        """Dictionary of givens to be used when evaluated the tensor variables.
+        This is built by fitting the data."""
+        return self._givens.copy()
+
     def fit(self, X, Y, skip_optimization=False, *args, **kwargs):
         """Fits the model.
 
@@ -162,6 +170,10 @@ class GaussianProcess(object):
         """
         self.X_train = X
         self.Y_train = Y
+        self._givens = {
+            self.X: X,
+            self.Y: Y,
+        }
 
         if skip_optimization:
             return
@@ -174,28 +186,24 @@ class GaussianProcess(object):
             raise Exception("You must .fit() before compiling")
 
         inputs = [self.x]
-        givens = {
-            self.X: self.X_train,
-            self.Y: self.Y_train,
-        }
 
         self._mu_f = theano.function(
             inputs,
             self._mu,
             name="mu",
-            givens=givens,
+            givens=self._givens,
             on_unused_input="ignore")
         self._var_f = theano.function(
             inputs,
             self._var,
             name="var",
-            givens=givens,
+            givens=self._givens,
             on_unused_input="ignore")
         self._std_f = theano.function(
             inputs,
             self._std,
             name="std",
-            givens=givens,
+            givens=self._givens,
             on_unused_input="ignore")
 
     def compute_mean(self, x):
@@ -269,6 +277,8 @@ class MultiGaussianProcess(GaussianProcess):
         self.X_train = None
         self.Y_train = None
 
+        self._givens = {}
+
         self._hyperparameters = [
             p for gp in self._processes for p in gp.hyperparameters
         ]
@@ -312,6 +322,11 @@ class MultiGaussianProcess(GaussianProcess):
         """
         self.X_train = X
         self.Y_train = Y
+        self._givens = {
+            gp.Y: Y[:, i].reshape((-1, 1))
+            for i, gp in enumerate(self._processes)
+        }
+        self._givens[self.X] = X
 
         # Fitting them individually is faster than fitting them together as
         # they are completely independent of each other.
@@ -324,29 +339,24 @@ class MultiGaussianProcess(GaussianProcess):
             raise Exception("You must .fit() before compiling")
 
         inputs = [self.x]
-        givens = {
-            gp.Y: self.Y_train[:, i].reshape((-1, 1))
-            for i, gp in enumerate(self._processes)
-        }
-        givens[self.X] = self.X_train
 
         self._mu_f = theano.function(
             inputs,
             self._mu,
             name="mu",
-            givens=givens,
+            givens=self._givens,
             on_unused_input="ignore")
         self._var_f = theano.function(
             inputs,
             self._var,
             name="var",
-            givens=givens,
+            givens=self._givens,
             on_unused_input="ignore")
         self._std_f = theano.function(
             inputs,
             self._std,
             name="std",
-            givens=givens,
+            givens=self._givens,
             on_unused_input="ignore")
 
 
