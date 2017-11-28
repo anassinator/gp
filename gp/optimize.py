@@ -36,7 +36,7 @@ def optimize(gp,
     x0 = np.hstack([p.get_value() for p in params])
 
     givens = {params[i]: inputs[i] for i in range(len(params))}
-    givens.update({gp.X: gp.X_train, gp.Y: gp.Y_train})
+    givens.update(gp.givens)
 
     def unflatten(x):
         y = []

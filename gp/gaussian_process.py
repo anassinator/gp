@@ -2,12 +2,14 @@
 """Gaussian Process."""
 
 import theano
+import warnings
 import numpy as np
 import theano.tensor as T
 import theano.sandbox.linalg as sT
 
 from .kernel import RBFKernel
 from .optimize import optimize
+from scipy.linalg import LinAlgError
 
 
 class GaussianProcess(object):
@@ -70,6 +72,7 @@ class GaussianProcess(object):
         self.X = T.dmatrix("X")
         self.Y = T.dmatrix("Y")
         self.x = T.dmatrix("x")
+        self.reg = T.dscalar("reg")
         self.X_train = None
         self.Y_train = None
 
@@ -87,6 +90,7 @@ class GaussianProcess(object):
         X = self.X
         Y = self.Y
         x = self.x
+        reg = self.reg
 
         if self._normalize_y:
             Y_mean = T.mean(Y, axis=0)
@@ -99,7 +103,7 @@ class GaussianProcess(object):
         K = self._kernel(X, X) + self._sigma_n**2 * T.eye(X.shape[0])
 
         # Guarantee positive definite.
-        K = 0.5 * (K + K.T)
+        K = 0.5 * (K + K.T) + reg * T.eye(K.shape[0])
 
         # Mean and variance functions.
         K_inv = sT.matrix_inverse(K)
@@ -158,27 +162,40 @@ class GaussianProcess(object):
         This is built by fitting the data."""
         return self._givens.copy()
 
-    def fit(self, X, Y, skip_optimization=False, *args, **kwargs):
+    def fit(self, X, Y, skip_optimization=False, max_reg=1.0, *args, **kwargs):
         """Fits the model.
 
         Args:
             X (SharedVariable<dmatrix>): Input data.
             Y (SharedVariable<dvector>): Output data.
             skip_optimization (bool): Optimize the hyperparameters.
+            max_reg (float): Maximum regularization term to use.
             *args, **kwargs: Additional positional and key-word arguments to
                 pass to `optimize()`.
         """
+        reg = 1e-5
+        reg_factor = 10
+
         self.X_train = X
         self.Y_train = Y
         self._givens = {
             self.X: X,
             self.Y: Y,
+            self.reg: reg,
         }
 
         if skip_optimization:
             return
 
-        return optimize(self, *args, **kwargs)
+        while reg <= max_reg:
+            try:
+                return optimize(self, *args, **kwargs)
+            except LinAlgError:
+                # Increase regularization term until it succeeds.
+                reg *= reg_factor
+                self._givens[self.reg] = reg
+
+        warnings.warn("exceeded maximum regularization: did not converge")
 
     def compile(self):
         """Compiles the gaussian process's tensors into proper functions."""
@@ -322,16 +339,15 @@ class MultiGaussianProcess(GaussianProcess):
         """
         self.X_train = X
         self.Y_train = Y
-        self._givens = {
-            gp.Y: Y[:, i].reshape((-1, 1))
-            for i, gp in enumerate(self._processes)
-        }
-        self._givens[self.X] = X
 
         # Fitting them individually is faster than fitting them together as
         # they are completely independent of each other.
         for i, gp in enumerate(self._processes):
             gp.fit(X, Y[:, i].reshape((-1, 1)), *args, **kwargs)
+
+        self._givens = {}
+        for gp in self._processes:
+            self._givens.update(gp.givens)
 
     def compile(self):
         """Compiles the gaussian process's tensors into proper functions."""
