@@ -62,7 +62,8 @@ class GaussianProcess(object):
         self._hyperparameters.append(sigma_n)
 
         self._bounds = [
-            kernel.bounds[i] for i, p in enumerate(kernel.hyperparameters)
+            kernel.bounds[i]
+            for i, p in enumerate(kernel.hyperparameters)
             if p != sigma_n
         ]
         self._bounds.append(bounds)
@@ -302,7 +303,8 @@ class MultiGaussianProcess(GaussianProcess):
 
         self._bounds = [
             gp.bounds[i]
-            for gp in self._processes for i, p in enumerate(gp.hyperparameters)
+            for gp in self._processes
+            for i, p in enumerate(gp.hyperparameters)
         ]
 
         # Defaults.
