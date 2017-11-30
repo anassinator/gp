@@ -1,8 +1,8 @@
 Gaussian Process
 ================
 
-.. image:: https://travis-ci.com/anassinator/gp.svg?token=FyA1SHksnNkHz1euHTTi&branch=master
-   :target: https://travis-ci.com/anassinator/gp
+.. image:: https://travis-ci.org/anassinator/gp.svg?branch=master
+  :target: https://travis-ci.org/anassinator/gp
 
 This is a *differentiable* `Gaussian Process
 <https://en.wikipedia.org/wiki/Gaussian_process>`_ implementation for
