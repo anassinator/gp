@@ -21,6 +21,12 @@ To install simply clone and run:
 
   python setup.py install
 
+You may also install the dependencies with `pipenv` as follows:
+
+.. code-block:: bash
+
+  pipenv install
+
 Usage
 -----
 

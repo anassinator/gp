@@ -1,15 +1,31 @@
 #!/usr/bin/env python
+"""Gaussian Process setup."""
 
 import os
-from gp import __version__
 from setuptools import setup
+
+from gp import __version__
 
 
 def read(fname):
+    """Reads a file's contents as a string.
+
+    Args:
+        fname: Filename.
+
+    Returns:
+        File's contents.
+    """
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 
-base_url = "https://github.com/anassinator/gp"
+BASE_URL = "https://github.com/anassinator/gp"
+INSTALL_REQUIRES = [
+    "numpy==1.14.2",
+    "scipy==1.0.0",
+    "six==1.11.0",
+    "Theano==1.0.1",
+]
 
 setup(
     name="gp",
@@ -19,11 +35,11 @@ setup(
     author="Anass Al",
     author_email="mr@anassinator.com",
     license="MIT",
-    url=base_url,
-    download_url="{}/tarball/{}".format(base_url, __version__),
+    url=BASE_URL,
+    download_url="{}/tarball/{}".format(BASE_URL, __version__),
     packages=["gp"],
     zip_safe=True,
-    install_requires=[read("requirements.txt").strip().split("\n")],
+    install_requires=INSTALL_REQUIRES,
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
