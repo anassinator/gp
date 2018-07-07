@@ -27,6 +27,13 @@ You may also install the dependencies with `pipenv` as follows:
 
   pipenv install
 
+Finally, you may add this to your own application with either:
+
+.. code-block:: bash
+
+  pip install 'git+https://github.com/anassinator/gp.git#egg=gp'
+  pipenv install 'git+https://github.com/anassinator/gp.git#egg=gp'
+
 Usage
 -----
 
@@ -44,14 +51,14 @@ After installation, :code:`import` and use as follows:
 where :code:`X` and :code:`Y` are your training data's inputs and outputs as
 :code:`torch.Tensor`.
 
-You can then use the Gaussian Process's estimates as a tensor in your own
-graphs:
+You can then use the Gaussian Process's estimates as tensors as follows:
 
 .. code-block:: python
 
   mean = gp(x)
   mean, std = gp(x, return_std=True)
   mean, covar = gp(x, return_covar=True)
+  mean, covar, var = gp(x, return_covar=True, return_var=True)
   mean, covar, std = gp(x, return_covar=True, return_std=True)
 
 The following is an example of what this Gaussian Process was able to estimate
@@ -87,6 +94,12 @@ needs. You can auto-format your changes with the following command:
 .. code-block:: bash
 
   yapf --recursive --in-place --parallel .
+
+You can install the formatter with:
+
+.. code-block:: bash
+
+  pipenv install --dev
 
 License
 -------

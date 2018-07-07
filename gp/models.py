@@ -99,6 +99,7 @@ class GaussianProcess(torch.nn.Module):
     def forward(self,
                 x,
                 return_mean=True,
+                return_var=False,
                 return_covar=False,
                 return_std=False,
                 **kwargs):
@@ -107,11 +108,14 @@ class GaussianProcess(torch.nn.Module):
         Args:
             x (Tensor): Inputs.
             return_mean (bool): Whether to return the mean.
-            return_covar (bool): Whether to return the covariance.
+            return_covar (bool): Whether to return the full covariance matrix.
+            return_var (bool): Whether to return the variance.
             return_std (bool): Whether to return the standard deviation.
 
         Returns:
             Tensor or tuple of Tensors.
+            The order of the tuple if all outputs are requested is:
+                (mean, covariance, variance, standard deviation).
         """
         X = self._X
         Y = self._Y
@@ -128,14 +132,18 @@ class GaussianProcess(torch.nn.Module):
             mean = K_s.mm(K_inv.mm(self._non_normalized_Y))
             outputs.append(mean)
 
-        # Compute covariance/standard deviation.
-        if return_covar or return_std:
+        # Compute covariance/variance/standard deviation.
+        if return_covar or return_var or return_std:
             covar = K_ss - K_s.mm(K_inv.mm(K_s.t()))
             if return_covar:
                 outputs.append(covar)
-            if return_std:
-                std = covar.diag().sqrt().reshape(-1, 1)
-                outputs.append(std)
+            if return_var or return_std:
+                var = covar.diag().reshape(-1, 1)
+                if return_var:
+                    outputs.append(var)
+                if return_std:
+                    std = var.sqrt()
+                    outputs.append(std)
 
         if len(outputs) == 1:
             return outputs[0]
