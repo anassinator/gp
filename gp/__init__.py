@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
-"""Gaussian Process implementation for Theano."""
+"""Gaussian Process implementation."""
 
 __version__ = "0.1.0"
 
-from .kernel import Kernel, RBFKernel
-from .gaussian_process import GaussianProcess, MultiGaussianProcess
+import kernels
+from .models import GaussianProcess, MultiGaussianProcess
 
-__all__ = ["GaussianProcess", "Kernel", "MultiGaussianProcess", "RBFKernel"]
+__all__ = ["GaussianProcess", "MultiGaussianProcess", "kernels"]

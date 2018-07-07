@@ -4,7 +4,7 @@
 import os
 from setuptools import setup
 
-from gp import __version__
+__version__ = "0.1.0"
 
 
 def read(fname):
@@ -22,18 +22,17 @@ def read(fname):
 BASE_URL = "https://github.com/anassinator/gp"
 INSTALL_REQUIRES = [
     "numpy==1.14.2",
-    "scipy==1.0.0",
     "six==1.11.0",
-    "Theano==1.0.1",
+    "torch==0.4.0",
 ]
 
 setup(
     name="gp",
     version=__version__,
-    description="Gaussian Process implementation for Theano",
+    description="Gaussian Process implementation for PyTorch",
     long_description=read("README.rst"),
     author="Anass Al",
-    author_email="mr@anassinator.com",
+    author_email="dev@anassinator.com",
     license="MIT",
     url=BASE_URL,
     download_url="{}/tarball/{}".format(BASE_URL, __version__),
