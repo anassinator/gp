@@ -45,7 +45,8 @@ After installation, :code:`import` and use as follows:
   from gp.kernels import RBFKernel, WhiteNoiseKernel
 
   k = RBFKernel() + WhiteNoiseKernel()
-  gp = GaussianProcess(k, X, Y)
+  gp = GaussianProcess(k)
+  gp.set_data(X, Y)
   gp.fit()
 
 where :code:`X` and :code:`Y` are your training data's inputs and outputs as

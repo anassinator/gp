@@ -22,7 +22,6 @@ def read(fname):
 BASE_URL = "https://github.com/anassinator/gp"
 INSTALL_REQUIRES = [
     "numpy==1.14.2",
-    "six==1.11.0",
     "torch==0.4.0",
 ]
 
